@@ -5,7 +5,7 @@ function newLinkSubscribe(parent, args, context, info) {
 const newLink = {
   subscribe: newLinkSubscribe,
   resolve: (payload) => {
-    return payload;
+    return payload.newLink;
   },
 };
 

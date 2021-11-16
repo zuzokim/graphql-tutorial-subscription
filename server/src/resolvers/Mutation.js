@@ -12,9 +12,10 @@ async function post(parent, args, context, info) {
       postedBy: { connect: { id: userId } },
     },
   });
-  console.log("???");
-  context.pubsub.publish("NEW_LINK", newLink);
-  console.log("???");
+
+  context.pubsub.publish("NEW_LINK", {
+    newLink,
+  });
 
   return newLink;
 }

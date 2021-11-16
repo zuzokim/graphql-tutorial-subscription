@@ -3,22 +3,21 @@ import ReactDOM from "react-dom";
 import "./styles/index.css";
 import App from "./components/App";
 import { BrowserRouter } from "react-router-dom";
-
+import { ApolloLink, Observable } from "@apollo/client/core";
+import { print } from "graphql";
+import { createClient } from "graphql-ws";
 import { split } from "@apollo/client";
-import { WebSocketLink } from "@apollo/client/link/ws";
 import { getMainDefinition } from "@apollo/client/utilities";
-
-// 1
 import {
   ApolloProvider,
   ApolloClient,
-  createHttpLink,
+  HttpLink,
   InMemoryCache,
 } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { AUTH_TOKEN } from "./constants";
 
-const httpLink = createHttpLink({
+const httpLink = new HttpLink({
   uri: "http://localhost:4000/graphql",
 });
 
@@ -33,23 +32,57 @@ const authLink = setContext((_, { headers }) => {
   };
 });
 
-const wsLink = new WebSocketLink({
-  uri: `ws://localhost:4000/subscriptions`,
-  options: {
-    reconnect: true,
-    timeout: 30000,
-    connectionParams: {
-      authToken: localStorage.getItem(AUTH_TOKEN),
-    },
+class WebSocketLink extends ApolloLink {
+  constructor(options) {
+    super();
+    this.client = createClient(options);
+  }
+
+  request(operation) {
+    return new Observable((sink) => {
+      return this.client.subscribe(
+        { ...operation, query: print(operation.query) },
+        {
+          next: sink.next.bind(sink),
+          complete: sink.complete.bind(sink),
+          error: (err) => {
+            if (Array.isArray(err))
+              // GraphQLError[]
+              return sink.error(
+                new Error(err.map(({ message }) => message).join(", "))
+              );
+
+            if (err instanceof CloseEvent)
+              return sink.error(
+                new Error(
+                  `Socket closed with event ${err.code} ${err.reason || ""}` // reason will be available on clean closes only
+                )
+              );
+
+            return sink.error(err);
+          },
+        }
+      );
+    });
+  }
+}
+
+const wslink = new WebSocketLink({
+  url: "ws://localhost:4000/graphql",
+  connectionParams: () => {
+    const token = localStorage.getItem(AUTH_TOKEN);
+
+    return {
+      authorization: token ? `Bearer ${token}` : "",
+    };
   },
 });
-
 const splitLink = split(
   ({ query }) => {
     const { kind, operation } = getMainDefinition(query);
     return kind === "OperationDefinition" && operation === "subscription";
   },
-  wsLink,
+  wslink,
   authLink.concat(httpLink)
 );
 

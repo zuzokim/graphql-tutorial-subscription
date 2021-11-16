@@ -1,12 +1,13 @@
 const { ApolloServer } = require("apollo-server-express");
+const { ApolloServerPluginDrainHttpServer } = require("apollo-server-core");
 const { makeExecutableSchema } = require("@graphql-tools/schema");
 const { createServer } = require("http");
 const express = require("express");
 const cors = require("cors");
 const { PubSub } = require("graphql-subscriptions");
-const { SubscriptionServer } = require("subscriptions-transport-ws");
+//const { SubscriptionServer } = require("subscriptions-transport-ws");
 const { PrismaClient } = require("@prisma/client");
-const { execute, subscribe } = require("graphql");
+//onst { execute, subscribe } = require("graphql");
 const Query = require("./resolvers/Query");
 const Mutation = require("./resolvers/Mutation");
 const Subscription = require("./resolvers/Subscription");
@@ -16,6 +17,8 @@ const Vote = require("./resolvers/Vote");
 const fs = require("fs");
 const path = require("path");
 const { getUserId } = require("./utils");
+const { WebSocketServer } = require("ws");
+const { useServer } = require("graphql-ws/lib/use/ws");
 
 const pubsub = new PubSub();
 
@@ -44,20 +47,18 @@ const schema = makeExecutableSchema({
 
   const httpServer = createServer(app);
 
-  const server = new ApolloServer({
-    subscriptions: {},
+  const formatError = (err) => {
+    console.error("--- GraphQL Error ---");
+    console.error("Path:", err.path);
+    console.error("Message:", err.message);
+    console.error("Code:", err.extensions.code);
+    console.error("Original Error", err.originalError);
+    return err;
+  };
+
+  const apolloServer = new ApolloServer({
     schema,
-    plugins: [
-      {
-        async serverWillStart() {
-          return {
-            async drainServer() {
-              subscriptionServer.close();
-            },
-          };
-        },
-      },
-    ],
+    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
     context: ({ req }) => {
       return {
         ...req,
@@ -66,17 +67,32 @@ const schema = makeExecutableSchema({
         userId: req && req.headers.authorization ? getUserId(req) : null,
       };
     },
+
+    formatError,
   });
 
-  const subscriptionServer = SubscriptionServer.create(
-    { schema, execute, subscribe },
-    { server: httpServer, path: "/subscriptions" }
-  );
+  await apolloServer.start();
+  apolloServer.applyMiddleware({ app });
+  await new Promise((resolve) => httpServer.listen({ port: 4000 }, resolve));
 
-  await server.start();
-  server.applyMiddleware({ app });
+  // create and use the websocket server
+  const wsServer = new WebSocketServer({
+    server: httpServer,
+    path: "/graphql",
+  });
 
-  httpServer.listen(4000, () =>
-    console.log(`Server is now running on http://localhost:${4000}/graphql`)
+  useServer(
+    {
+      schema,
+      context: ({ req }) => {
+        return {
+          ...req,
+          prisma,
+          pubsub,
+          userId: req && req.headers.authorization ? getUserId(req) : null,
+        };
+      },
+    },
+    wsServer
   );
 })();

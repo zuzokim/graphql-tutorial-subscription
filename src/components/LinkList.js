@@ -35,11 +35,12 @@ const NEW_LINKS_SUBSCRIPTION = gql`
   subscription {
     newLink {
       id
+      createdAt
       url
       description
-      createdAt
       postedBy {
         id
+
         name
       }
       votes {
@@ -107,33 +108,34 @@ const LinkList = () => {
     variables: getQueryVariables(isNewPage, page),
   });
 
-  // const { data: data2 } = useSubscription(NEW_LINKS_SUBSCRIPTION);
-  // console.log(data2);
-  console.log(data, "data????");
+  React.useEffect(() => {
+    console.log("sub");
+    subscribeToMore({
+      document: NEW_LINKS_SUBSCRIPTION,
+      updateQuery: (prev, { subscriptionData }) => {
+        if (!subscriptionData.data) return prev;
 
-  subscribeToMore({
-    document: NEW_LINKS_SUBSCRIPTION,
-    variables: getQueryVariables(isNewPage, page),
-    updateQuery: (prev, { subscriptionData }) => {
-      //console.log(subscriptionData, "subscriptionData");
-      if (!subscriptionData.data) return prev;
-      const newLink = subscriptionData.data.newLink;
-      const exists = prev.feed.links.find(({ id }) => id === newLink.id);
-      if (exists) return prev;
+        const newLink = subscriptionData.data.newLink;
 
-      return Object.assign({}, prev, {
-        feed: {
-          links: [newLink, ...prev.feed.links],
-          count: prev.feed.links.length + 1,
-          __typename: prev.feed.__typename,
-        },
-      });
-    },
-  });
+        const exists = prev.feed.links.find(({ id }) => id === newLink.id);
 
-  subscribeToMore({
-    document: NEW_VOTES_SUBSCRIPTION,
-  });
+        if (exists) return prev;
+
+        console.log(newLink);
+
+        return Object.assign({}, prev, {
+          feed: {
+            ...prev.feed,
+            links: [newLink, ...prev.feed.links],
+            count: prev.feed.links.length + 1,
+            __typename: prev.feed.__typename,
+          },
+        });
+      },
+    });
+
+    //subscribeToMore({ document: NEW_VOTES_SUBSCRIPTION });
+  }, []);
 
   return (
     <>

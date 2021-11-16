@@ -1,8 +1,8 @@
-import React from 'react';
-import { AUTH_TOKEN, LINKS_PER_PAGE } from '../constants';
-import { timeDifferenceForDate } from '../utils';
-import { useMutation, gql } from '@apollo/client';
-import { FEED_QUERY } from './LinkList';
+import React from "react";
+import { AUTH_TOKEN, LINKS_PER_PAGE } from "../constants";
+import { timeDifferenceForDate } from "../utils";
+import { useMutation, gql } from "@apollo/client";
+import { FEED_QUERY } from "./LinkList";
 
 const VOTE_MUTATION = gql`
   mutation VoteMutation($linkId: ID!) {
@@ -26,16 +26,17 @@ const VOTE_MUTATION = gql`
 
 const Link = (props) => {
   const { link } = props;
+  //console.log(props, "props Link");
 
   const authToken = localStorage.getItem(AUTH_TOKEN);
 
   const take = LINKS_PER_PAGE;
   const skip = 0;
-  const orderBy = { createdAt: 'desc' };
+  const orderBy = { createdAt: "desc" };
 
   const [vote] = useMutation(VOTE_MUTATION, {
     variables: {
-      linkId: link.id
+      linkId: link.id,
     },
     update(cache, { data: { vote } }) {
       const { feed } = cache.readQuery({
@@ -43,15 +44,15 @@ const Link = (props) => {
         variables: {
           take,
           skip,
-          orderBy
-        }
+          orderBy,
+        },
       });
 
       const updatedLinks = feed.links.map((feedLink) => {
         if (feedLink.id === link.id) {
           return {
             ...feedLink,
-            votes: [...feedLink.votes, vote]
+            votes: [...feedLink.votes, vote],
           };
         }
         return feedLink;
@@ -61,16 +62,16 @@ const Link = (props) => {
         query: FEED_QUERY,
         data: {
           feed: {
-            links: updatedLinks
-          }
+            links: updatedLinks,
+          },
         },
         variables: {
           take,
           skip,
-          orderBy
-        }
+          orderBy,
+        },
       });
-    }
+    },
   });
 
   return (
@@ -80,7 +81,7 @@ const Link = (props) => {
         {authToken && (
           <div
             className="ml1 gray f11"
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: "pointer" }}
             onClick={vote}
           >
             ▲
@@ -93,8 +94,8 @@ const Link = (props) => {
         </div>
         {authToken && (
           <div className="f6 lh-copy gray">
-            {link.votes.length} votes | by{' '}
-            {link.postedBy ? link.postedBy.name : 'Unknown'}{' '}
+            {link.votes.length} votes | by{" "}
+            {link.postedBy ? link.postedBy.name : "Unknown"}{" "}
             {timeDifferenceForDate(link.createdAt)}
           </div>
         )}

@@ -6,7 +6,7 @@ import { LINKS_PER_PAGE } from "../constants";
 
 const CREATE_LINK_MUTATION = gql`
   mutation PostMutation($description: String!, $url: String!) {
-    post(description: $description, url: $url) {
+    post(url: $url, description: $description) {
       id
       createdAt
       url
@@ -40,10 +40,11 @@ const CreateLink = () => {
       url: formState.url,
     },
     update: (cache, { data: { post } }) => {
+      console.log("update");
       const take = LINKS_PER_PAGE;
       const skip = 0;
       const orderBy = { createdAt: "desc" };
-      // debugger;
+
       const data = cache.readQuery({
         query: FEED_QUERY,
         variables: {
@@ -52,7 +53,6 @@ const CreateLink = () => {
           orderBy,
         },
       });
-      console.log("data: ", data);
       cache.writeQuery({
         query: FEED_QUERY,
         data: {
